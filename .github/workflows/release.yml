@@ -82,3 +82,123 @@ jobs:
         with:
           files: |
             ${{ env.path }}/${{ env.package }}
+
+  publish-homebrew:
+    name: Publish to Homebrew
+    runs-on: ubuntu-22.04
+    needs: build-node
+    if: github.event_name == 'release'
+    steps:
+      - name: Extract version
+        id: extract_version
+        run: |
+          echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+      - name: Update Homebrew tap
+        uses: mislav/bump-homebrew-formula-action@v3
+        with:
+          formula-name: pop-cli
+          homebrew-tap: r0gue-io/homebrew-pop
+          download-url: https://github.com/r0gue-io/pop-cli/releases/download/${{ github.ref_name }}/pop-aarch64-apple-darwin.tar.gz
+          commit-message: |
+            pop-cli ${{ steps.extract_version.outputs.VERSION }}
+
+            Created by R0GUE - https://go-r0gue.io/
+        env:
+          COMMITTER_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+
+  publish-deb:
+    name: Publish Debian/Ubuntu packages
+    runs-on: ubuntu-22.04
+    needs: build-node
+    if: github.event_name == 'release'
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          pattern: binaries-*
+          merge-multiple: true
+
+      - name: Install cargo-deb
+        run: cargo install cargo-deb
+
+      - name: Extract binaries
+        run: |
+          mkdir -p binaries/aarch64
+          mkdir -p binaries/x86_64
+          tar -xzf artifacts/pop-aarch64-unknown-linux-gnu.tar.gz -C binaries/aarch64
+          tar -xzf artifacts/pop-x86_64-unknown-linux-gnu.tar.gz -C binaries/x86_64
+
+      - name: Build .deb package (x86_64)
+        run: |
+          mkdir -p target/x86_64-unknown-linux-gnu/production
+          cp binaries/x86_64/pop target/x86_64-unknown-linux-gnu/production/pop
+          cargo deb -p pop-cli --target x86_64-unknown-linux-gnu --no-build
+
+      - name: Build .deb package (aarch64)
+        run: |
+          rustup target add aarch64-unknown-linux-gnu
+          mkdir -p target/aarch64-unknown-linux-gnu/production
+          cp binaries/aarch64/pop target/aarch64-unknown-linux-gnu/production/pop
+          cargo deb -p pop-cli --target aarch64-unknown-linux-gnu --no-build
+
+      - name: Upload .deb packages to release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            target/x86_64-unknown-linux-gnu/debian/*.deb
+            target/aarch64-unknown-linux-gnu/debian/*.deb
+
+  publish-rpm:
+    name: Publish RPM packages
+    runs-on: ubuntu-22.04
+    needs: build-node
+    if: github.event_name == 'release'
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          pattern: binaries-*
+          merge-multiple: true
+
+      - name: Install cargo-generate-rpm
+        run: cargo install cargo-generate-rpm
+
+      - name: Extract binaries
+        run: |
+          mkdir -p binaries/aarch64
+          mkdir -p binaries/x86_64
+          tar -xzf artifacts/pop-aarch64-unknown-linux-gnu.tar.gz -C binaries/aarch64
+          tar -xzf artifacts/pop-x86_64-unknown-linux-gnu.tar.gz -C binaries/x86_64
+
+      - name: Build .rpm package (x86_64)
+        run: |
+          mkdir -p target/x86_64-unknown-linux-gnu/production
+          cp binaries/x86_64/pop target/x86_64-unknown-linux-gnu/production/pop
+          cargo generate-rpm -p crates/pop-cli --target x86_64-unknown-linux-gnu
+
+      - name: Build .rpm package (aarch64)
+        run: |
+          rustup target add aarch64-unknown-linux-gnu
+          mkdir -p target/aarch64-unknown-linux-gnu/production
+          cp binaries/aarch64/pop target/aarch64-unknown-linux-gnu/production/pop
+          cargo generate-rpm -p crates/pop-cli --target aarch64-unknown-linux-gnu
+
+      - name: Upload .rpm packages to release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            target/x86_64-unknown-linux-gnu/generate-rpm/*.rpm
+            target/aarch64-unknown-linux-gnu/generate-rpm/*.rpm

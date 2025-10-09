@@ -74,3 +74,14 @@ v5 = []
 wasm-contracts = ["pop-contracts/v5", "dep:pop-contracts", "wallet-integration", "v5"]
 wallet-integration = ["dep:axum", "dep:open", "dep:tower-http"]
 integration-tests = []
+
+[package.metadata.deb]
+maintainer = "R0GUE <hello@r0gue.io>"
+copyright = "2024, R0GUE <hello@r0gue.io>"
+license-file = ["../../LICENSE", "0"]
+extended-description = "Pop CLI is an all-in-one tool for Polkadot development."
+section = "utility"
+priority = "optional"
+
+[package.metadata.generate-rpm]
+license = "GPL-3.0"
