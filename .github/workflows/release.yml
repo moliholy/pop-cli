@@ -91,11 +91,6 @@ jobs:
     needs: build-node
     if: github.event_name == 'release'
     steps:
-      - name: Extract version
-        id: extract_version
-        run: |
-          echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_ENV
-
       - name: Checkout tap repository
         uses: actions/checkout@v4
         with:
@@ -108,4 +103,5 @@ jobs:
           cd homebrew-tap
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          VERSION=${GITHUB_REF#refs/tags/v}
           ./update.sh "${VERSION}"
